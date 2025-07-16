@@ -1,0 +1,7 @@
+"0","# explore random effect of year"
+"0","smooths_re <- smooth_estimates(mod_null_final, "
+"0","                               smooth = c(""s(year_f)"", ""s(whale_ID)""))"
+"0",""
+"0","smooths_re_long <- smooths_re %>%"
+"0","  pivot_longer(c(whale_ID, year_f), names_to=""parameter"", values_to = ""vals"") %>%"
+"0","  drop_na(vals)"

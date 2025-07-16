@@ -1,0 +1,4 @@
+"0",""
+"0","no2016 <- ggarrange(temp_no2016_plot, hpx_no2016_plot,  nrow = 1)"
+"0","no2016_wtitle <- annotate_figure(no2016, top = text_grob(""2016 excluded"", "
+"0","               color = ""darkred"", face = ""bold"", size = 14))"

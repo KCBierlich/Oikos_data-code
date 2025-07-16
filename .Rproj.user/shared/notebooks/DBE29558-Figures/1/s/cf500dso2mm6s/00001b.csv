@@ -1,0 +1,4 @@
+"0","mx_env_AID %>% select(winter, winter_precip_cm) %>% distinct() %>%"
+"0","  ggplot() + "
+"0","  geom_col(aes(x = winter, y = winter_precip_cm), fill = ""darkblue"", alpha = 0.85) + theme_bw() + "
+"0","  ylab(""Winter Precipitation (cm)"") + xlab(""Winter (October-March)"")"

@@ -1,0 +1,7 @@
+"0","# get unique DOY across all years"
+"0","all_unique_doys <- mx_env %>%"
+"0","  select(DOY) %>%"
+"0","  distinct() %>%"
+"0","  mutate(year = ""all"") %>%"
+"0","  select(year, DOY) %>%"
+"0","  arrange(DOY)"

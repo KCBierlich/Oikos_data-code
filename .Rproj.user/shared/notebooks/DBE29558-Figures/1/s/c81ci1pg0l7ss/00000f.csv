@@ -1,0 +1,3 @@
+"0","# data for rug plot"
+"0","# basically need to align it with the smooth name in the smooth_DOY_long df"
+"0","smooth_DOY_names <- unique(smooth_DOY$smooth)"

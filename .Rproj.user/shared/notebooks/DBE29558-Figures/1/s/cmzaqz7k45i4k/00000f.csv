@@ -1,0 +1,4 @@
+"0","mi_plot_all <- plot_grid(mi_temp_plot, mi_hpx_plot, "
+"0","                      mi_RX_plot, mi_CUTI_plot, mi_precip_plot, "
+"0","                      mi_kelp_plot, mi_large_pdo_plot, ncol = 2, labels = ""AUTO"")"
+"0","mi_plot_all"

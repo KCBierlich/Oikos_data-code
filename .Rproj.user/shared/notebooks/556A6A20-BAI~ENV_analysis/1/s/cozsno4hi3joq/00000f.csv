@@ -1,0 +1,5 @@
+"0","mod_L.4 <- gam(data = mx_env, method = ""ML"", select = T, "
+"0","    BAI_mean ~ s(whale_ID, bs = ""re"") + "
+"0","      PDO_season)"
+"0",""
+"0","gam.check(mod_L.4) # increasing k results in same results"

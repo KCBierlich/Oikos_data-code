@@ -1,0 +1,6 @@
+"0","## Histogram"
+"0","bai_hist <- mx_env_AID %>% ggplot() + theme_bw() + "
+"0","  geom_histogram(aes(x = BAI_mean, fill = year_f)) + "
+"0","  geom_vline(xintercept = bai_summary$mean, lty = 2) + "
+"0","  year_colors_fill + theme_bw() + xlab(""BAI"")"
+"0","bai_hist"

@@ -1,0 +1,46 @@
+Data & Code for "Body condition of gray whales is correlated with multi-scale ocean variability".
+Submitted to Oikos.   
+
+
+Steps:   
+1. Run "analysis/BAI~ENV_analysis.Rmd" to reproduce results from manuscript. This markdown will run and compare the models at each scale (Null, Fine, Meso, Large), as outlined in manuscript.   
+2. Once step one is complete, run "Figure/Figures.Rmd" to reproduce figures from manuscript.  
+
+
+Data description for "data/oikos_BAI_ENV_data.csv":    
+
+whale_ID = Individual whale ID.  
+AID = whale_ID + date (YYMMDD).  
+year = year.  
+year_f = year as factor.  
+month = month.  
+date = date (MMDDYY).  
+DOY = Day of Year.  
+sex = sex (Male, Female, Unknown).  
+DU = Demographic Unit: Calf, Juvenile Female (JF), Juvenile Male (JM), Juvenile Sex Unknown (JU), Lactating Female (LF), Mature Female (MF), Mature Male (MM), Mature Unknown Sex (MU), Pregnant Female (PF), Post-weaning Calf (PWCalf), Post-weaning Female (PWF).  
+BAI_mean = mean of the posterior distribution for BAI.  
+BAI_sd = standard deviation of the posterior distritbution for BAI.       
+BAI_low = lower 95% higest posterior density interval of the posterior distritbution for BAI.      
+BAI_upper = upper 95% higest posterior density interval of the posterior distritbution for BAI.   
+mean_temp_30d = mean temperature in the previous 30 days from the BAI measurement.    
+mean_temp_15d = mean temperature in the previous 15 days from the BAI measurement.      
+prev_30d_hypoxic_days = number of hypoxic days in the previous 30 days from the BAI measurement.   
+prev_15d_hypoxic_days = number of hypoxic days in the previous 15 days from the BAI measurement.   
+prev15d_cuti_sum = sum of CUTI in the previous 15 days from the BAI measurement.   
+prev15d_cuti_mean = mean CUTI in the previous 15 days from the BAI measurement.  
+ndays_Rx_15d = number of relaxation days in the previous 15 days from the BAI measurement.  
+prev30d_cuti_sum = sum of CUTI in the previous 30 days from the BAI measurement.  
+prev30d_cuti_mean = mean CUTI in the previous 30 days from the BAI measurement.  
+ndays_Rx_30d = number of relaxation days in the previous 30 days from the BAI measurement.  
+winter = the years encompassing the winter preceding the feeding season.      
+winter_precip_cm = precipitation (rainfall, in cm) in the winter preceding the feeding season.  
+kelp_area = area of kelp canopy cover (m2) in study area. from kelpwatch.org.  
+MEI = Multivariate El Niño Southern Oscillation (ENSO) Index (MEI) of the previous bimonthly period (so if BAI is from July, the MEI value for May/June is used).   
+MEI_season = mean MEI for each season (March/April – August/September).   
+PDO = the Pacific Decadal Oscillation (PDO) value from the previous month.   
+PDO_season = the mean PDO for each season (April and September).   
+CUTI_RX_ratio = the cumulative sum of CUTI on days classified as upwelling events and the total number of relaxation days between the date of the spring transition and the end of our sampling period (Oct. 15) for each year (represent upwelling and relaxation at the seasonal scale).   
+
+
+
+

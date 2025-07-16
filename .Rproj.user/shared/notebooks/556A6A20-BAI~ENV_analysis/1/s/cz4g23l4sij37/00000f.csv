@@ -1,0 +1,8 @@
+"0","mod_m.1 <- gam(data = mx_env, method = ""ML"","
+"0","    BAI_mean ~ s(whale_ID, bs = ""re"") + "
+"0","      s(ndays_Rx_15d, bs = ""ts"") + "
+"0","      s(prev15d_cuti_mean, bs = ""ts"") +"
+"0","      winter_precip_cm + "
+"0","      kelp_area)"
+"0",""
+"0","gam.check(mod_m.1) # increasing k results in same results"

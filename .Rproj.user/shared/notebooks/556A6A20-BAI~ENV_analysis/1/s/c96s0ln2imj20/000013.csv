@@ -1,0 +1,7 @@
+"0","# save models and data
+save(mx_env, mod_null_final, mod_fine_final, mod_meso_final, mod_large_final,
+     file = ""final_models/final_models&data.RData"")
+"
+"2","Warning: cannot open compressed file 'final_models/final_models&data.RData', probable reason 'No such file or directory'"
+"2","Error in gzfile(file, ""wb"") : cannot open the connection
+"

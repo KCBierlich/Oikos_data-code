@@ -1,0 +1,5 @@
+"0","myColors_year <- brewer.pal(8, ""Paired"")"
+"0","names(myColors_year) <- levels(as.factor(mx_env$year_f))"
+"0",""
+"0","year_colors <- scale_colour_manual(name = ""year"", values = myColors_year)"
+"0","year_colors_fill <- scale_fill_manual(name = ""year"", values = myColors_year)"

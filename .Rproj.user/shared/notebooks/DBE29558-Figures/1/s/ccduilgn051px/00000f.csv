@@ -1,0 +1,5 @@
+"0","myColors_smooth <- brewer.pal(8, ""Paired"")"
+"0","names(myColors_smooth) <- levels(as.factor(smooth_DOY_final$smooth))[2:9]"
+"0",""
+"0","smooth_colors <- scale_colour_manual(name = ""year"", values = myColors_smooth)"
+"0","smooth_colors_fill <- scale_fill_manual(name = ""year"", values = myColors_smooth)"

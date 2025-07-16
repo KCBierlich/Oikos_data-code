@@ -1,0 +1,714 @@
+---
+title: "BAI ~ ENV"
+output: html_document
+date: "2025-07-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This analysis contains the final dataset with quality controlled measurements and environmental data.
+
+# Pacakges
+```{r}
+library(tidyverse)
+library(lubridate)
+library(ggdist)
+library(ggpubr)
+library(coda)
+library(stringr)
+library(RColorBrewer)
+
+library(mgcv) # for GAMs
+library(gratia) # for plotting GAMs
+library(oddsratio) # for using no_plot(), which suppresses the actual plot when saving GAM outputs 
+library(cowplot) # multiple plots in one figure
+library(lattice)
+library(performance) # check collinearity,  # https://easystats.github.io/performance/reference/check_collinearity.html 
+
+library(reshape2) # to use melt() for multiple imputations
+
+library(conflicted)
+conflict_prefer("filter", "dplyr")
+conflict_prefer("rename", "dplyr")
+conflict_prefer("mutate", "dplyr") 
+conflict_prefer("summarise", "dplyr") 
+
+# load Highland Statistics' quick function for checking collinearity
+
+source(file.path("..", "data/functions/HighstatLibV8.R"))
+```
+
+# Load data
+```{r}
+# load measurements w/ environment data
+mx_env_AID <- read.csv(file.path("..", "data/oikos_BAI_ENV_data.csv")) %>% 
+  mutate(whale_ID = as.factor(whale_ID), year_f = as.factor(year_f)) 
+```
+
+
+# BAI by DU summaries 
+BAI for each demographic unit
+```{r}
+write_csv(rbind(mx_env_AID %>% group_by(DU) %>%
+  summarise(n = n(), 
+            mean = round(mean(BAI_mean), 2),
+            median = round(median(BAI_mean), 2),
+            "std. dev." = round(sd(BAI_mean), 2),
+            min = round(min(BAI_mean), 2),
+            max = round(max(BAI_mean), 2)),
+  mx_env_AID %>% summarise(DU = "population", 
+                           n = n(), 
+                           mean = round(mean(BAI_mean), 2),
+            median = round(median(BAI_mean), 2),
+            "std. dev." = round(sd(BAI_mean), 2),
+            min = round(min(BAI_mean), 2),
+            max = round(max(BAI_mean), 2))) %>% rename("Demographic Unit" = DU),
+  "../Tables/BAI_by_DU.csv")
+
+```
+
+# Models {.tabset}
+
+
+## DU Selection
+For the models, we will only include juvenile and mature whales (JF, JM, JU, MF, MM, MU) and we will first compare if including DU in the model as its own term improves the model or not. 
+
+So excluding: Calf, LF, PF, PWCalf, PWF
+```{r}
+# n individuals across all DUs
+length(unique(mx_env_AID$whale_ID))
+
+# n individuals per DU
+all_du_env_sum <- mx_env_AID %>% select(whale_ID, DU) %>% distinct()
+table(all_du_env_sum$DU)
+
+# select DUs
+# only including juvenile and mature whales
+mx_env <- mx_env_AID %>% 
+  filter(DU == "JF" | DU == "JM" | DU == "MF"| DU == "MM" | DU == "JU" | DU == "MU") %>% 
+  mutate(DU = as.factor(DU))
+```
+
+n individuals per DU for full dataset
+Calf     JF     JM     JU     LF     MF     MM     MU     PF PWCalf    PWF 
+  10     11      7     17      6     35     31      8      3      3      4 
+    
+
+## n DU Summaries
+```{r}
+# number of unique individuals
+length(unique(mx_env$whale_ID))
+
+# number of samples
+nrow(mx_env)
+
+# number of individuals with repeat samples
+repeated_samples_list_models_dataset <- mx_env %>% group_by(whale_ID) %>% 
+  summarise(repeated_samples = n()) %>% 
+  group_by(repeated_samples) %>% summarise(n_individuals = n())
+
+# number of individuals with >1 sample
+repeated_samples_list_models_dataset %>% filter(repeated_samples >1) %>% summarise(sum(n_individuals))
+
+## save output
+write.csv(repeated_samples_list_models_dataset, "../Tables/repeated_samples_model_dataset.csv")
+
+# number of samples per DU
+table(mx_env$DU)
+
+# number of individuals per DU
+du_env_sum <- mx_env %>% select(whale_ID, DU) %>% distinct()
+table(du_env_sum$DU)
+```
+
+n = 101 IDs 
+n = 391 samples 
+
+n samples per DU
+ JF  JM  JU  MF  MM  MU 
+  31  26  45 176 100  13 
+
+n individuals per DU
+JF JM JU MF MM MU 
+11  7 17 35 31  8 
+
+
+
+## 1. Null Model {.tabset}
+No ENV variables included. 
+First need to compare models including/excluding DU as a separate term
+```{r}
+# N.1
+mod_n.1 <- gam(data = mx_env, method = "ML",
+    BAI_mean ~ s(DOY, bs = "ts", k = 15, m = 2) + 
+      s(DOY, by = year_f, m = 1) + s(year_f, bs = "re") + 
+      DU + s(whale_ID, bs = "re")) 
+
+gam.check(mod_n.1)
+summary(mod_n.1)      
+draw(mod_n.1, parametric = TRUE)
+
+
+
+# N.2
+mod_n.2 <- gam(data = mx_env, method = "ML",
+    BAI_mean ~ s(DOY, bs = "ts", k = 15, m = 2) + 
+      s(DOY, by = year_f, m = 1) + s(year_f, bs = "re") + s(whale_ID, bs = "re")) 
+
+
+gam.check(mod_n.2)
+summary(mod_n.2)      
+draw(mod_n.2, parametric = TRUE)
+```
+
+
+### Compare model with and without DU
+```{r}
+AIC(mod_n.1, mod_n.2) %>% arrange(AIC)
+```
+Models essentially equivalent (AID difference <2), but since no DU is the more parsimonious model, we will use that one and exclude DU as its own term in the model.
+
+
+### *Final Null
+```{r}
+# Remove DU from NULL
+mod_null_final <- gam(data = mx_env, method = "REML", select = T, 
+    BAI_mean ~ s(DOY, bs = "ts", k = 15, m = 2) + 
+      s(DOY, by = year_f, m = 1) + s(year_f, bs = "re") + s(whale_ID, bs = "re")) 
+
+
+gam.check(mod_null_final)
+summary(mod_null_final)      
+draw(mod_null_final, parametric = TRUE)
+```
+
+
+## 2. Fine Scale {.tabset}
+ 
+### Collinearity
+```{r, warning=FALSE}
+myvar <- c("BAI_mean", 
+           "DOY",
+           
+           "mean_temp_30d",
+           "mean_temp_15d",
+           
+           "prev_30d_hypoxic_days",
+           "prev_15d_hypoxic_days"
+           )
+
+Mypairs(mx_env[,myvar]) 
+round(cor(mx_env[,myvar], use="complete.obs", method = "pearson"), 2)
+```
+
+Temp and Hypoxia not correlated with each other at 15 or 30 days. 
+
+
+### F.1 prior 15 days 
+```{r}
+mod_fine_prev15 <- gam(data = mx_env, method = "ML", select = TRUE,
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      s(mean_temp_15d, bs = "ts") + 
+      s(prev_15d_hypoxic_days, bs = "ts"))
+
+gam.check(mod_fine_prev15)
+summary(mod_fine_prev15)      
+draw(mod_fine_prev15, page = 1)
+```
+
+### F.2 prior 30 days 
+```{r}
+mod_fine_prev30 <- gam(data = mx_env, method = "ML", select = TRUE,
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      s(mean_temp_30d, bs = "ts") +  
+      s(prev_30d_hypoxic_days, bs = "ts"))
+
+gam.check(mod_fine_prev30)
+summary(mod_fine_prev30)      
+draw(mod_fine_prev30, page = 1)
+```
+
+
+### Compare Fine models
+```{r}
+fine_mod_eval <- tibble(gam_names = c("mod_fine_prev30", "mod_fine_prev15"), 
+                   gam = list(mod_fine_prev30, mod_fine_prev15)) %>% 
+  mutate(gam_family = map(gam, function(g){family(g)$family}),
+         gam_perf = map(gam, broom::glance),
+         gam_sum = map(gam, summary),
+         dev.exp = map_dbl(gam_sum, "dev.expl"),
+         smooths = map(gam, broom::tidy)) %>% 
+  unnest(cols = c(gam_family, gam_perf)) %>% 
+  dplyr::select(-c(logLik, df.residual, deviance))
+
+# deviance explained and families
+fine_mod_eval %>% 
+  dplyr::select(gam_names, gam_family, AIC, dev.exp) %>% 
+  mutate(dev.exp = round(dev.exp * 100, 1)) %>% arrange(-dev.exp)
+```
+prior 30 days (F.2) is the preferred model. 
+
+
+### *Final Fine model
+prior 30 days (F.2)
+```{r}
+mod_fine_final <- gam(data = mx_env, method = "REML", select = TRUE,
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      s(mean_temp_30d, bs = "ts") +  
+      s(prev_30d_hypoxic_days, bs = "ts"))
+
+gam.check(mod_fine_final)
+concurvity(mod_fine_final)
+summary(mod_fine_final)      
+draw(mod_fine_final, page = 1)
+```
+
+
+### Supplemental - Fine models
+To ensure estimated and missing data does not unduly effect model results, compare fine scale models with 1) all of 2016 excluded and 2) all of June removed.
+
+#### 1) 2016 Excluded 
+Confirming if estimated DO in 2016 has any impact on model results. Will run model with 2016 data removed.
+```{r}
+table(mx_env$year)# n = 20 in 2016
+
+mod_fine_final_no2016 <- gam(data = mx_env %>% filter(year != 2016), method = "REML",
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      s(mean_temp_30d, bs = "ts") +  
+      s(prev_30d_hypoxic_days, bs = "ts"))
+
+gam.check(mod_fine_final_no2016)
+summary(mod_fine_final_no2016)      
+draw(mod_fine_final_no2016, page = 1)
+```
+
+Results are similar when removing 2016.
+
+
+
+#### 2) June Excluded 
+```{r}
+filt <- mx_env %>% filter(!(month == 6))
+
+mod_fine_final_noJune <- gam(data = filt, method = "REML",
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      s(mean_temp_30d, bs = "ts") +  
+      s(prev_30d_hypoxic_days, bs = "ts"))
+
+gam.check(mod_fine_final_noJune)
+summary(mod_fine_final_noJune)      
+draw(mod_fine_final_noJune, page = 1)
+```
+Results do not change if we remove June 2020.
+
+
+#### Plots results
+##### 2016 excluded
+```{r}
+p_obj_no2016 <- plot(mod_fine_final_no2016, residual = TRUE)
+
+# Temp
+p_obj_no2016.temp <- p_obj_no2016[[2]] # select second component
+sm_df.temp <- as.data.frame(p_obj_no2016.temp[c("x", "se", "fit")])
+data_df.temp <- as.data.frame(p_obj_no2016.temp[c("raw", "p.resid")])
+
+temp_no2016_plot <- ggplot(sm_df.temp, aes(x = x, y = fit)) + theme_bw() + 
+  geom_rug(data = data_df.temp, mapping = aes(x = raw, y = NULL), sides = "b") +
+  geom_line() + 
+  #geom_point(data = data_df.temp, mapping = aes(x = raw, y = p.resid)) + 
+  geom_ribbon(aes(ymin = fit-se, ymax = fit + se, y = NULL), alpha = 0.5, fill = "skyblue") +
+  labs(x = "mean temperature @ 25 m depth", y = "Partial effect") + 
+  scale_y_continuous(breaks = c(0.06, -0.03, 0, 0.03, .06))
+temp_no2016_plot
+
+# Hypoxia
+p_obj_no2016.hypx <- p_obj_no2016[[3]] # select third component
+sm_df.hypx <- as.data.frame(p_obj_no2016.hypx[c("x", "se", "fit")])
+data_df.hypx <- as.data.frame(p_obj_no2016.hypx[c("raw", "p.resid")])
+
+hpx_no2016_plot <- ggplot(sm_df.hypx, aes(x = x, y = fit)) + theme_bw() + 
+  geom_rug(data = data_df.hypx, mapping = aes(x = raw, y = NULL), sides = "b") +
+  #geom_point(data = data_df.hypx, mapping = aes(x = raw, y = p.resid), alpha = 0.7) + 
+  geom_ribbon(aes(ymin = fit-se, ymax = fit + se, y = NULL), alpha = 0.5, fill = "skyblue") +
+  geom_line() + labs(x = "n hypoxic days in previous 30 days", y = "Partial effect") +
+  scale_y_continuous(breaks = c(-2, -1, 0, 1, 2), 
+    labels = c("-2.00", "-1.00", "0.00", "1.00", "2.00"))
+hpx_no2016_plot
+
+no2016 <- ggarrange(temp_no2016_plot, hpx_no2016_plot,  nrow = 1)
+no2016_wtitle <- annotate_figure(no2016, top = text_grob("2016 excluded", 
+               color = "darkred", face = "bold", size = 14))
+```
+
+
+##### June excluded
+```{r}
+p_obj_noJune <- plot(mod_fine_final_noJune, residual = TRUE)
+
+# Temp
+p_obj_noJune.temp <- p_obj_noJune[[2]] # select second component
+sm_df.temp <- as.data.frame(p_obj_noJune.temp[c("x", "se", "fit")])
+data_df.temp <- as.data.frame(p_obj_noJune.temp[c("raw", "p.resid")])
+
+temp_noJune_plot <- ggplot(sm_df.temp, aes(x = x, y = fit)) + theme_bw() + 
+  geom_rug(data = data_df.temp, mapping = aes(x = raw, y = NULL), sides = "b") +
+  geom_line() + 
+  #geom_point(data = data_df.temp, mapping = aes(x = raw, y = p.resid)) + 
+  geom_ribbon(aes(ymin = fit-se, ymax = fit + se, y = NULL), alpha = 0.5, fill = "skyblue") +
+  labs(x = "mean temperature @ 25 m depth", y = "Partial effect") + 
+  scale_y_continuous(breaks = c(0.06, -0.03, 0, 0.03, .06))
+temp_noJune_plot
+
+# Hypoxia
+p_obj_noJune.hypx <- p_obj_noJune[[3]] # select third component
+sm_df.hypx <- as.data.frame(p_obj_noJune.hypx[c("x", "se", "fit")])
+data_df.hypx <- as.data.frame(p_obj_noJune.hypx[c("raw", "p.resid")])
+
+hpx_noJune_plot <- ggplot(sm_df.hypx, aes(x = x, y = fit)) + theme_bw() + 
+  geom_rug(data = data_df.hypx, mapping = aes(x = raw, y = NULL), sides = "b") +
+  #geom_point(data = data_df.hypx, mapping = aes(x = raw, y = p.resid), alpha = 0.7) + 
+  geom_ribbon(aes(ymin = fit-se, ymax = fit + se, y = NULL), alpha = 0.5, fill = "skyblue") +
+  geom_line() + labs(x = "n hypoxic days in previous 30 days", y = "Partial effect") +
+  scale_y_continuous(breaks = c(-2, -1, 0, 1, 2), 
+    labels = c("-2.00", "-1.00", "0.00", "1.00", "2.00"))
+hpx_noJune_plot
+
+noJune <- ggarrange(temp_noJune_plot, hpx_noJune_plot,  nrow = 1)
+noJune_wtitle <- annotate_figure(noJune, top = text_grob("June (2016-2023) excluded", 
+               color = "darkred", face = "bold", size = 14))
+noJune_wtitle
+```
+
+##### Combined plots
+```{r}
+ggarrange(no2016_wtitle, noJune_wtitle, ncol = 1)
+ggsave("../Figures/Supp_figures/fine_scale_no2016_&_noJune.png", height = 7, width = 7)
+```
+
+
+
+## 3. Meso Scale {.tabset}
+
+### Collinearity 
+```{r, warning = FALSE}
+myvar <- c("BAI_mean", 
+           "DOY",
+           
+           "prev15d_cuti_sum",
+           "prev15d_cuti_mean",
+           "ndays_Rx_15d", 
+           #"max_Rx_EventDays_15d",
+           
+           "prev30d_cuti_sum",
+           "prev30d_cuti_mean",
+           "ndays_Rx_30d", 
+           #"max_Rx_EventDays_30d",
+
+           "winter_precip_cm",
+           "kelp_area")
+
+Mypairs(mx_env[,myvar]) 
+round(cor(mx_env[,myvar], use="complete.obs", method = "pearson"), 2)
+```
+
+cuti_mean and RX_events are not collinear at 15 and 30 days.
+
+### M.1: prior 15 days, separate terms
+mean CUTI and n Rx days (prior 15 days) as separate terms.
+```{r}
+mod_m.1 <- gam(data = mx_env, method = "ML",
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      s(ndays_Rx_15d, bs = "ts") + 
+      s(prev15d_cuti_mean, bs = "ts") +
+      winter_precip_cm + 
+      kelp_area)
+
+gam.check(mod_m.1) # increasing k results in same results
+
+summary(mod_m.1)
+draw(mod_m.1, parametric = TRUE)
+```
+
+### M.2: prior 15 days, interaction
+mean CUTI and n Rx days (prior 15 days) as an interaction.
+```{r, warning = FALSE}
+mod_m.2 <- gam(data = mx_env, method = "ML",
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      te(ndays_Rx_15d, prev15d_cuti_mean, bs = c("ts", "ts")) + 
+      winter_precip_cm + 
+      kelp_area)
+
+gam.check(mod_m.2) # increasing k results in same results
+summary(mod_m.2)
+draw(mod_m.2, parametric = TRUE)
+
+plot(mod_m.2, parametric = FALSE, select = 2, scheme = 2)
+vis.gam(mod_m.2, view = c("ndays_Rx_15d", "prev15d_cuti_mean"), plot.type = "persp", 
+        theta = 230, phi = 20, r = 1)
+```
+
+
+### M.3: prior 30 days, separate terms
+mean CUTI and n Rx days (prior 30 days) as separate terms.
+```{r}
+mod_m.3 <- gam(data = mx_env, method = "ML",
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      s(ndays_Rx_30d, bs = "ts") + 
+      s(prev30d_cuti_mean, bs = "ts") +
+      winter_precip_cm + 
+      kelp_area)
+
+gam.check(mod_m.3) # increasing k results in same results
+summary(mod_m.3)
+draw(mod_m.3, parametric = TRUE)
+```
+
+
+### M.4: prior 30 days, interaction
+mean CUTI and n Rx days (prior 30 days) as an interaction.
+```{r, warning = FALSE}
+mod_m.4 <- gam(data = mx_env, method = "ML",
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      te(ndays_Rx_30d, prev30d_cuti_mean, bs = c("ts", "ts")) + 
+      winter_precip_cm + 
+      kelp_area)
+
+gam.check(mod_m.4) # increasing k results in same results
+summary(mod_m.4)
+draw(mod_m.4, parametric = TRUE)
+
+plot(mod_m.4, parametric = FALSE, select = 2, scheme = 2)
+vis.gam(mod_m.4, view = c("ndays_Rx_30d", "prev30d_cuti_mean"), plot.type = "persp", 
+        theta = 230, phi = 20, r = 1)
+```
+
+
+### Compare Meso models
+```{r}
+meso_mod_eval <- tibble(gam_names = c("mod_m.4", "mod_m.3", 
+                                      "mod_m.2", "mod_m.1"),
+                   gam = list(mod_m.4, mod_m.3, 
+                              mod_m.2, mod_m.1)) %>% 
+  mutate(gam_family = map(gam, function(g){family(g)$family}),
+         gam_perf = map(gam, broom::glance),
+         gam_sum = map(gam, summary),
+         dev.exp = map_dbl(gam_sum, "dev.expl"),
+         smooths = map(gam, broom::tidy)) %>% 
+  unnest(cols = c(gam_family, gam_perf)) %>% 
+  dplyr::select(-c(logLik, df.residual, deviance))
+
+# deviance explained and families
+meso_mod_eval %>% 
+  dplyr::select(gam_names, gam_family, AIC, dev.exp) %>% 
+  mutate(dev.exp = round(dev.exp * 100, 1)) %>% arrange(-dev.exp)
+```
+
+ 
+### *Final Meso model
+```{r}
+mod_meso_final <- gam(data = mx_env, method = "REML",
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      s(ndays_Rx_30d, bs = "ts") + 
+      s(prev30d_cuti_mean, bs = "ts") +
+      winter_precip_cm + 
+      kelp_area)
+
+gam.check(mod_meso_final) # increasing k results in same results
+concurvity(mod_meso_final)
+summary(mod_meso_final)
+draw(mod_meso_final, parametric = TRUE)
+```
+
+### Supplementary - Kelp check
+Since kelp is so high in 2023, we will see if it is still significant if we exclude 2023 
+```{r}
+mod_meso_final_no2023 <- gam(data = mx_env %>% filter(year != 2023), method = "REML",
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      s(ndays_Rx_30d, bs = "ts") + 
+      s(prev30d_cuti_mean, bs = "ts") +
+      winter_precip_cm + 
+      kelp_area)
+
+gam.check(mod_meso_final_no2023) # increasing k results in same results
+summary(mod_meso_final_no2023)
+draw(mod_meso_final_no2023, parametric = TRUE)
+```
+kelp no longer significant if we remove 2023 data. 
+
+
+
+
+## 4. Large Scale {.tabset}
+
+### Collinearity 
+```{r, warning = FALSE}
+myvar <- c("BAI_mean", 
+           "DOY",
+           
+           "MEI",
+           "MEI_season",
+           
+           "PDO",
+           "PDO_season",
+           
+           "CUTI_RX_ratio"
+           )
+
+Mypairs(mx_env[,myvar]) 
+round(cor(mx_env[,myvar], use="complete.obs", method = "pearson"), 2)
+```
+
+MEI and PDO not correlated (but have high concurvity - see below "L.X. MEI + PDO").
+MEI_season and PDO_season not correlated.
+CUTI/RX is not correlated w/ PDO_season, but is w/ MEI season. 
+
+
+### L.1. MEI
+```{r}
+# MEI
+mod_L.1 <- gam(data = mx_env, method = "ML", select = T, 
+    BAI_mean ~ s(DOY, bs = "ts", k = 15, m = 2) + 
+      s(whale_ID, bs = "re") + 
+      MEI)
+      
+summary(mod_L.1)
+draw(mod_L.1, parametric = TRUE)
+```
+
+
+### L.2. MEI Season
+```{r}
+# MEI the year prior
+mod_L.2 <- gam(data = mx_env, method = "ML", select = T, 
+    BAI_mean ~ 
+      s(whale_ID, bs = "re") + 
+      MEI_season)
+
+summary(mod_L.2)
+draw(mod_L.2, parametric = TRUE)
+```
+
+
+### L.3 PDO
+```{r}
+mod_L.3 <- gam(data = mx_env, method = "ML", select = T, 
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      s(PDO, bs = "ts"))
+
+gam.check(mod_L.3) # increasing k results in same results
+summary(mod_L.3)
+draw(mod_L.3)
+```
+
+
+### L.4 PDO season
+```{r}
+mod_L.4 <- gam(data = mx_env, method = "ML", select = T, 
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      PDO_season)
+
+gam.check(mod_L.4) # increasing k results in same results
+summary(mod_L.4)
+draw(mod_L.4)
+```
+
+
+### L.5. CUTI/RX
+```{r}
+mod_L.5 <- gam(data = mx_env, method = "ML", select = T, 
+    BAI_mean ~ s(DOY, bs = "ts", k = 15, m = 2) + 
+      s(whale_ID, bs = "re") + 
+      CUTI_RX_ratio)
+
+summary(mod_L.5)
+draw(mod_L.5, parametric = TRUE)
+```
+
+
+### L.6. MEI_season + PDO_season
+```{r}
+mod_L.6 <- gam(data = mx_env, method = "ML", select = T, 
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      MEI_season + PDO_season)
+
+gam.check(mod_L.6) # increasing k results in same results
+summary(mod_L.6)
+draw(mod_L.6)
+```
+
+
+### L.7. PDO + CUTI/RX
+```{r}
+mod_L.7 <- gam(data = mx_env, method = "ML", select = T, 
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      PDO_season + CUTI_RX_ratio)
+
+gam.check(mod_L.7) # increasing k results in same results
+summary(mod_L.7)
+draw(mod_L.7, parametric = TRUE)
+```
+
+
+### L.X. MEI + PDO
+```{r}
+mod_L.X <- gam(data = mx_env, method = "ML", select = T, 
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      s(MEI, bs = "ts") +
+      s(PDO, bs = "ts"))
+
+gam.check(mod_L.X) # increasing k results in same results
+concurvity(mod_L.X) # >0.8
+summary(mod_L.X)
+draw(mod_L.X)
+```
+** !! HIGH CONCURVITY !! ** (0.998). Thus exclude.
+
+
+### Compare Large scale models
+```{r}
+mod_eval <- tibble(gam_names = c("mod_L.1", "mod_L.2", "mod_L.3", "mod_L.4", 
+                                 "mod_L.5", "mod_L.6", "mod_L.7"),
+                   gam = list(mod_L.1, mod_L.2, mod_L.3, mod_L.4,
+                              mod_L.5, mod_L.6, mod_L.7)) %>% 
+  mutate(gam_family = map(gam, function(g){family(g)$family}),
+         gam_perf = map(gam, broom::glance),
+         gam_sum = map(gam, summary),
+         dev.exp = map_dbl(gam_sum, "dev.expl"),
+         smooths = map(gam, broom::tidy)) %>% 
+  unnest(cols = c(gam_family, gam_perf)) %>% 
+  dplyr::select(-c(logLik, df.residual, deviance))
+
+# deviance explained and families
+mod_eval %>% 
+  dplyr::select(gam_names, gam_family, AIC, dev.exp) %>% 
+  mutate(dev.exp = round(dev.exp * 100, 1)) %>% arrange(-dev.exp)
+```
+
+
+### *Final Large Model
+```{r}
+mod_large_final <- gam(data = mx_env, method = "REML", select = T, 
+    BAI_mean ~ s(whale_ID, bs = "re") + 
+      s(PDO, bs = "ts"))
+
+gam.check(mod_large_final) # increasing k results in same results
+
+summary(mod_large_final)
+draw(mod_large_final)
+```
+
+
+
+
+## 5. Save Finals models
+```{r}
+# save models and data
+save(mx_env, mod_null_final, mod_fine_final, mod_meso_final, mod_large_final,
+     file = "final_models/final_models&data.RData")
+```
+
+
+
+

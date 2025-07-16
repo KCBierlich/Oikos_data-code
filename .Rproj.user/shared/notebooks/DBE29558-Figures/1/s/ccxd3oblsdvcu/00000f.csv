@@ -1,0 +1,9 @@
+"0","kelp2 <- mx_env %>% mutate(kelp_area_ha = as.numeric(kelp_area/10000)) %>%"
+"0","  select(c(year_f, kelp_area_ha)) %>% distinct()"
+"0",""
+"0","kelp2 %>% "
+"0","  ggplot() + theme_bw() + "
+"0","  geom_col(aes(x = year_f, y = kelp_area_ha), fill = ""darkgreen"", cex = 3) +"
+"0","   ylab(""kelp canopy (hectares)"") + xlab(""years"")"
+"2","Warning: Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
+Please use `linewidth` instead."

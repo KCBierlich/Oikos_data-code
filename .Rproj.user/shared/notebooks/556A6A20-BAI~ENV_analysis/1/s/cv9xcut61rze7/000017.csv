@@ -1,0 +1,5 @@
+"0",""
+"0","noJune <- ggarrange(temp_noJune_plot, hpx_noJune_plot,  nrow = 1)"
+"0","noJune_wtitle <- annotate_figure(noJune, top = text_grob(""June (2016-2023) excluded"", "
+"0","               color = ""darkred"", face = ""bold"", size = 14))"
+"0","noJune_wtitle"

@@ -1,0 +1,6 @@
+"0","mod_fine_final <- gam(data = mx_env, method = ""REML"", select = TRUE,"
+"0","    BAI_mean ~ s(whale_ID, bs = ""re"") + "
+"0","      s(mean_temp_30d, bs = ""ts"") +  "
+"0","      s(prev_30d_hypoxic_days, bs = ""ts""))"
+"0",""
+"0","gam.check(mod_fine_final)"

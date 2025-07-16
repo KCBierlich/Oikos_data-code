@@ -1,0 +1,5 @@
+"0","# get unique DOY for each year"
+"0","rug <- mx_env %>%"
+"0","  select(year, DOY) %>%"
+"0","  distinct() %>% "
+"0","  arrange(year, DOY)"

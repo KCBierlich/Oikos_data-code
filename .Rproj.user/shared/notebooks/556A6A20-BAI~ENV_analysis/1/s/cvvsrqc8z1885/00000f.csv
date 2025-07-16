@@ -1,0 +1,7 @@
+"0","mod_m.4 <- gam(data = mx_env, method = ""ML"","
+"0","    BAI_mean ~ s(whale_ID, bs = ""re"") + "
+"0","      te(ndays_Rx_30d, prev30d_cuti_mean, bs = c(""ts"", ""ts"")) + "
+"0","      winter_precip_cm + "
+"0","      kelp_area)"
+"0",""
+"0","gam.check(mod_m.4) # increasing k results in same results"

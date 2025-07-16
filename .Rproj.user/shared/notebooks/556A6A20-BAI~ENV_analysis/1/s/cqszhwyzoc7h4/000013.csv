@@ -1,0 +1,7 @@
+"0","# Remove DU from NULL"
+"0","mod_null_final <- gam(data = mx_env, method = ""REML"", select = T, "
+"0","    BAI_mean ~ s(DOY, bs = ""ts"", k = 15, m = 2) + "
+"0","      s(DOY, by = year_f, m = 1) + s(year_f, bs = ""re"") + s(whale_ID, bs = ""re"")) "
+"0",""
+"0",""
+"0","gam.check(mod_null_final)"
